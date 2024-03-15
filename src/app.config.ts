@@ -1,10 +1,7 @@
 import config from "@colyseus/tools";
-
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { monitor } from "@colyseus/monitor";
-
-// import { RedisDriver } from "@colyseus/redis-driver";
-// import { RedisPresence } from "@colyseus/redis-presence";
+import { LobbyRoom } from "colyseus";
 
 /**
  * Import your Room files
@@ -23,20 +20,14 @@ export default config({
 
     initializeTransport: (options) => new WebSocketTransport(options),
 
+    // initializeGameServer: (gameServer) => {
+    //     /**
+    //      * Define your room handlers:
+    //      */
+    //     gameServer.define('room', MyRoom);
+    // },
     initializeGameServer: (gameServer) => {
-        /**
-         * Define your room handlers:
-         */
-        gameServer.define('room1', MyRoom);
-        gameServer.define('room2', MyRoom);
-        gameServer.define('room3', MyRoom);
-        gameServer.define('room4', MyRoom);
-        gameServer.define('room5', MyRoom);
-        gameServer.define('room6', MyRoom);
-        gameServer.define('room7', MyRoom);
-        gameServer.define('room8', MyRoom);
-        gameServer.define('room9', MyRoom);
-        gameServer.define('room10', MyRoom);
+        gameServer.define("my_room", MyRoom).enableRealtimeListing();
     },
 
     initializeExpress: (app) => {

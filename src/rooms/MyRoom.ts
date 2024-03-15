@@ -39,14 +39,17 @@ export class MyRoom extends Room<MyRoomState> {
 
   onJoin(client: Client, options: any) {
     console.log(client.sessionId, "joined!");
-    var newPlayer = new Player(options["playerName"], this.state.numberOfPlayer);
+    let pName: string = this.state.numberOfPlayer > 0 ? options["playerName"] : options["creatorId"];
+    var newPlayer = new Player(pName, this.state.numberOfPlayer);
     this.state.players.set(client.sessionId, newPlayer);
-    console.log("Player[" + this.state.numberOfPlayer + "] " + options["playerName"] + " joined!");
+    console.log("Player[" + this.state.numberOfPlayer + "] " + pName + " joined!");
 
     // Send welcome message to the client.
-    client.send("welcomeMessage", "Welcome player[" + this.state.numberOfPlayer + "] " + options["playerName"] + " to Colyseus!");
+    client.send("welcomeMessage", "Welcome player[" + this.state.numberOfPlayer + "] " + pName + " to Colyseus!");
     this.state.numberOfPlayer += 1;
 
+    console.log(`set metadata player${this.state.numberOfPlayer}` + pName);
+    this.setMetadata({ [`player${this.state.numberOfPlayer}`]: pName });
     //if number of player is equal to maximum player , start game
     if (this.state.numberOfPlayer == GameRules.MAX_PLAYER_IN_ROOM) {
       setTimeout(() => { this.ChangeGameState(GameState.gameBegin); }, 500);
@@ -59,6 +62,9 @@ export class MyRoom extends Room<MyRoomState> {
     this.state.numberOfPlayer -= 1;
     this.state.players.delete(client.sessionId);
     console.log(client.sessionId, "left!");
+    if (this.state.numberOfPlayer <= 1) {
+      this.ChangeGameState(GameState.gameEnd);
+    }
     if (this.state.numberOfPlayer == 0) {
       this.disconnect();
     }
@@ -77,6 +83,7 @@ export class MyRoom extends Room<MyRoomState> {
     this.timmer.UpdateTimmer(deltaTime);
 
     this.state.remainTimeInTurn = this.GetRemainTimeInTurn();
+    this.state.gameTotalTime = this.timmer.GetDurFromStartGame();
     switch (this.state.gameState) {
       case GameState.gameBegin:
         if (this.GetRemainTimeInTurn() < 0) {
@@ -140,7 +147,6 @@ export class MyRoom extends Room<MyRoomState> {
     this.state.gameState = newGameState;
     if (newGameState == GameState.gameBegin) {
       this.state.gridValue = this.initGridValue();
-      console.log("Grid value: ", this.state.gridValue.toString());
       this.timmer.StartTimmer();
     }
     else if (newGameState == GameState.chooseTile) {
@@ -148,7 +154,7 @@ export class MyRoom extends Room<MyRoomState> {
     }
     else if (newGameState == GameState.revealTile) {
       //confirm target position of each player
-      this.state.players.forEach((player: Player) => {
+      this.state.players.forEach((player: Player, clientId: string) => {
         let tarPos: TargetPos = this.targetPos.get(player.pSlot);
         if (tarPos == null) return;
 
@@ -169,6 +175,16 @@ export class MyRoom extends Room<MyRoomState> {
           if (this.state.gridValue[tileSlotFromPos] == -2) {
             console.log("Player[" + player.pSlot + "]:" + player.pName + " unlocked a good magic tile!");
             if (this.state.goodEffectType[tileSlotFromPos] == 0) {
+              let client: Client = this.clients.getById(clientId);
+              let guide: string = "";
+              if (this.state.playerHoldMushroomIdx > 0) {
+                guide = "A player is holding the mushroom!";
+              }
+              else {
+                let row: number = Math.floor(this.state.mushroomSlot / 6);
+                guide = "The mushroom is in row " + row;
+              }
+              client.send("informMushroomGuide", guide);
               console.log("Magic tile cast a spell that give position of mushroom guide!");
             }
           }
@@ -199,8 +215,14 @@ export class MyRoom extends Room<MyRoomState> {
     }
     else if (newGameState == GameState.gameEnd) {
       console.log("Game end!");
+      //if there is only a play in this room
+      if (this.state.numberOfPlayer == 1) {
+        let player: Player = this.state.players.values().next().value;
+        this.broadcast("informSpecialWinner", "All other player left! Player '" + player.pName + "' won");
+      }
+
       if (this.state.playerHoldMushroomIdx > 0) {
-        this.broadcast("informWinner", { pSlot: this.state.playerHoldMushroomIdx, byMushroom: true});
+        this.broadcast("informWinner", { pSlot: this.state.playerHoldMushroomIdx, byMushroom: true });
       }
       //chose winner by point
       else {
@@ -209,7 +231,7 @@ export class MyRoom extends Room<MyRoomState> {
         this.state.players.forEach((player: Player) => {
           if (player.point > maxPt) { maxPt = player.point; winnerSlot = player.pSlot; }
         });
-        this.broadcast("informWinner", { pSlot: winnerSlot,  byMushroom: false});
+        this.broadcast("informWinner", { pSlot: winnerSlot, byMushroom: false });
 
       }
     }
@@ -250,11 +272,6 @@ export class MyRoom extends Room<MyRoomState> {
       console.log("Player[" + message.pSlot + "] has won the game!");
       this.broadcast("informAPlayerEndGame", { pSlot: message.pSlot });
     })
-    this.onMessage("playerLostMushroom", (client, message: PlayerLostMushroomMessage) => {
-      console.log("Player[" + message.playerLostSlot + "] has lost the mushroom!");
-      this.state.mushroomSlot = message.mrNewPosX * 6 + message.mrNewPosY;
-      this.broadcast("informAPlayerLostMushroom", { pSlot: message.playerLostSlot }); //give slot of player that has lost mushroom
-    });
     this.onMessage("votedPlayer", (client, message: ActionFromClientMessage) => {
       if (this.state.gameState == GameState.faceOff) {
         let clientVote: Player = this.state.players.get(client.sessionId);
@@ -264,7 +281,7 @@ export class MyRoom extends Room<MyRoomState> {
       }
     });
     this.onMessage("sendChat", (client, message) => {
-      this.broadcast("informChat", { pSlot: message.pSlot, msg: message.msg });
+      this.broadcast("informChat", { pSlot: message.pSlot, msg: message.msg }, { except: client });
     })
   }
   private setServerPause(pause: boolean) {
@@ -343,7 +360,7 @@ export class MyRoom extends Room<MyRoomState> {
         isSet = true;
       }
     }
-    this.broadcast("informPlayerGetALostMushroomSpell", {
+    this.broadcast("informPlayerGetALostMushroom", {
       playerGetSpellSlot: player.pSlot,
       mushroomGetLost: 1
     }, { afterNextPatch: false });

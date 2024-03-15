@@ -21,4 +21,7 @@ export class Timmer {
     public GetDurFromBeginingTurn(): number {
         return this.GetCurrTime() - this.lastMarkedTime;
     }
+    public GetDurFromStartGame(): number { 
+        return this.GetCurrTime() - this.startTime;
+    }
 }

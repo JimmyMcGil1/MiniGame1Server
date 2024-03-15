@@ -30,6 +30,7 @@ export class MyRoomState extends Schema {
   @type({map: "number"}) badEffectType: number[] = Array(4).fill(0);
   @type("string") gameState: string = "waitForGameBegin";
   @type("number") remainTimeInTurn: number = 0;
+  @type("number") gameTotalTime: number = 0;
 
 
   public PlayerMoveToPos(player: Player, x: number, y: number) {
