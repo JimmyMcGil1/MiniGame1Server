@@ -30,7 +30,7 @@ export class MyRoom extends Room<MyRoomState> {
     this.autoDispose = true;
     this.maxClients = 4;
     this.setState(new MyRoomState());
-
+    this.roomId = options.roomId;
     this.registerMessageFromClient();
     this.setServerPause(false);
     this.timmer = new Timmer();
