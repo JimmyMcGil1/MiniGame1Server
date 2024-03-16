@@ -10,5 +10,7 @@ export const GameRules = {
     MAX_PLAYER_IN_ROOM: 2,
 
     NUMBER_OF_EMPTY_TILE: 3,
+    BONUS_POINT_FOR_VOTE_RIGHT: 4,
+    MINUS_POINT_FOR_VOTE_WRONG: 3,
 
 }

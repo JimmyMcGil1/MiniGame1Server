@@ -27,6 +27,7 @@ export class MyRoom extends Room<MyRoomState> {
     console.info("*********************** ROOM CREATED ***********************");
     console.log(options);
     console.info("***********************");
+    this.setSeatReservationTime(20);
     this.autoDispose = true;
     this.maxClients = 4;
     this.setState(new MyRoomState());
@@ -116,25 +117,52 @@ export class MyRoom extends Room<MyRoomState> {
           this.voteMap.forEach((val: number) => {
             votedValLst[val] += 1;
           });
-          let maxVotedPSlot: number = 0;
-          let maxVotedVal: number = votedValLst[0];
-          for (let i = 1; i < votedValLst.length; i++) {
+          let maxVotedPSlot: number = -1;
+          let maxVotedVal: number = 0;
+          let isOnlyOneMax: boolean = false;
+          for (let i = 0; i < votedValLst.length; i++) {
             const votedVal = votedValLst[i];
             if (votedVal > maxVotedVal) {
               maxVotedVal = votedVal;
               maxVotedPSlot = i;
+              isOnlyOneMax = true
+            }
+            else if (votedVal == maxVotedVal) {
+              isOnlyOneMax = false;
             }
           }
-          console.log("Max voted player:" + maxVotedPSlot + " with " + maxVotedVal + " votes!");
-          if (maxVotedPSlot == this.state.playerHoldMushroomIdx) {
-            for (let [key, value] of this.state.players) {
-              if (value.pSlot == maxVotedPSlot) {
-                this.PlayerLostMushroom(value);
-                break;
+          if (maxVotedPSlot >= 0 && isOnlyOneMax) {
+            console.log("Max voted player:" + maxVotedPSlot + " with " + maxVotedVal + " votes!");
+            if (maxVotedPSlot == this.state.playerHoldMushroomIdx) {
+              for (let [key, value] of this.state.players) {
+                if (value.pSlot == maxVotedPSlot) {
+                  this.PlayerLostMushroom(value);
+                  break;
+                }
               }
             }
           }
+          else
+            console.log("Not found highest voted player!");
+
+
+          //pVal: player that has been voted by player pKey
+          this.voteMap.forEach((pVal: number, pKey: number) => {
+            if (pVal == maxVotedPSlot && isOnlyOneMax) {
+              let client: Client = this.getClientByPSlot(pKey);
+              let player: Player = this.state.players.get(client.sessionId);
+              player.point += GameRules.BONUS_POINT_FOR_VOTE_RIGHT;
+              client.send("voteResult", "You have voted the right player! You got " + GameRules.BONUS_POINT_FOR_VOTE_RIGHT + " bonus points!");
+            }
+            else {
+              let client: Client = this.getClientByPSlot(pKey);
+              if (client == null) return;
+              let player: Player = this.state.players.get(client.sessionId);
+              client.send("voteResult", "We haven't found the mushroom keeper yet! Let try again next round!");
+            }
+          });
           this.votedCouter = 0;
+          this.voteMap.clear();
           this.ChangeGameState(GameState.chooseTile);
         }
         break;
@@ -177,7 +205,7 @@ export class MyRoom extends Room<MyRoomState> {
             if (this.state.goodEffectType[tileSlotFromPos] == 0) {
               let client: Client = this.clients.getById(clientId);
               let guide: string = "";
-              if (this.state.playerHoldMushroomIdx > 0) {
+              if (this.state.playerHoldMushroomIdx >= 0) {
                 guide = "A player is holding the mushroom!";
               }
               else {
@@ -221,7 +249,7 @@ export class MyRoom extends Room<MyRoomState> {
         this.broadcast("informSpecialWinner", "All other player left! Player '" + player.pName + "' won");
       }
 
-      if (this.state.playerHoldMushroomIdx > 0) {
+      if (this.state.playerHoldMushroomIdx >= 0) {
         this.broadcast("informWinner", { pSlot: this.state.playerHoldMushroomIdx, byMushroom: true });
       }
       //chose winner by point
@@ -268,10 +296,7 @@ export class MyRoom extends Room<MyRoomState> {
 
     });
 
-    this.onMessage("endGame", (client, message: ActionFromClientMessage) => {
-      console.log("Player[" + message.pSlot + "] has won the game!");
-      this.broadcast("informAPlayerEndGame", { pSlot: message.pSlot });
-    })
+
     this.onMessage("votedPlayer", (client, message: ActionFromClientMessage) => {
       if (this.state.gameState == GameState.faceOff) {
         let clientVote: Player = this.state.players.get(client.sessionId);
@@ -373,5 +398,16 @@ export class MyRoom extends Room<MyRoomState> {
     if (36 - GameRules.NUMBER_OF_EMPTY_TILE - unlockTileCter < this.state.numberOfPlayer) {
       return true;
     }
+  }
+  private getClientByPSlot(pSlot: number): Client {
+    let client: Client = null;
+    this.state.players.forEach((player: Player, clientId: string) => {
+      if (player.pSlot == pSlot) {
+        console.log("Found client with clientId:" + clientId);
+        client = this.clients.getById(clientId);
+        return client;
+      }
+    })
+    return client;
   }
 }
