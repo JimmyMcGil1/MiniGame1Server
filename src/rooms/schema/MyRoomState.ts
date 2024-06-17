@@ -32,12 +32,6 @@ export class MyRoomState extends Schema {
   @type("number") remainTimeInTurn: number = 0;
   @type("number") gameTotalTime: number = 0;
 
-
-  public PlayerMoveToPos(player: Player, x: number, y: number) {
-   
-    
-  }
-
 }
 export enum GameState {
   waitForGameBegin = "waitForGameBegin",
@@ -61,7 +55,7 @@ export type PlayerLostMushroomMessage = {
   mrNewPosY: number,
   playerLostSlot: number,
 }
-export type TargetPos = {
+export type TargetTile = {
   targetX: number,
   targetY: number
 }

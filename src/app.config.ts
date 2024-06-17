@@ -1,7 +1,6 @@
 import config from "@colyseus/tools";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { monitor } from "@colyseus/monitor";
-import { LobbyRoom } from "colyseus";
 
 /**
  * Import your Room files
@@ -13,9 +12,6 @@ export default config({
     getId: () => "Your Colyseus App",
 
     options: {
-        // devMode: true,
-        // driver: new RedisDriver(),
-        // presence: new RedisPresence(),
     },
 
     initializeTransport: (options) => new WebSocketTransport(options),

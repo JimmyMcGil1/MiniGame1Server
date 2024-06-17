@@ -1,6 +1,6 @@
-FROM node:14
+FROM node:15
 
-ENV PORT 8080
+ENV PORT 2567
 
 WORKDIR /src/index.ts
 
@@ -13,6 +13,6 @@ RUN npm ci
 
 COPY . .
 
-EXPOSE 8080
+EXPOSE 2567
 
 CMD [ "npm", "start" ]
